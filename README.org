@@ -1,0 +1,101 @@
+* Api
+
+Crea una API completisima, para entregarte muchos documentos en diferente formatos (pdf, word, txt, etc). La salida de esta api debe ser en formato JSON. Ademas, la funcion que debes hacer con estos documentos te la detallo a continuacion.
+
+
+La funcion sera corregir formularios basados, en el sentido del complimientos legal y normativo basandote netamente en el conocimiento entregado por esos documentos. Es decir, que tu funcion con la api sera consumir estos pdf para adquirir el conocimiento, luego aplicarlo para corregir formularios. 
+* res
+
+#+begin_src python
+# **models.py**
+
+from fastapi import FastAPI, UploadFile
+from pydantic import BaseModel
+import pdfminer
+import re
+
+app = FastAPI()
+
+class Document(BaseModel):
+    file: UploadFile
+
+class Formulario(BaseModel):
+    campo1: str
+    campo2: str
+    # ... otros campos del formulario
+
+# **main.py**
+
+from fastapi import FastAPI, HTTPException
+from pydantic import ValidationError
+import pdfminer
+import re
+import os
+
+app = FastAPI()
+
+document_directory = "documents"
+
+@app.post("/correct-formulario")
+async def correct_formulario(document: Document):
+    try:
+        # Procesar el documento PDF
+        pdf_file = document.file.read()
+        pdfminer_handler = pdfminer.PDFHandler(pdf_file)
+        text = ""
+        for page in pdfminer_handler.get_pages():
+            text += page.extractText()
+
+        # Extraer conocimiento relevante del texto
+        knowledge = extract_knowledge(text)
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    # Corregir el formulario con el conocimiento extraído
+    formulario_corregido = correct_formulario(knowledge)
+
+    # Almacenar el documento procesado en el directorio de documentos
+    with open(document_directory + "/" + document.file.filename, "wb") as f:
+        f.write(pdf_file.read())
+
+    return formulario_corregido
+
+def extract_knowledge(text: str) -> dict:
+    knowledge = {}
+
+    # Extraer campo1 y valor1
+    pattern = r"Campo 1: (.+)"
+    match = re.search(pattern, text)
+    if match:
+        knowledge["campo1"] = match.group(1)
+
+    # Extraer campo2 y valor2
+    pattern = r"Campo 2: (.+)"
+    match = re.search(pattern, text)
+    if match:
+        knowledge["campo2"] = match.group(1)
+
+    # ... extraer otros campos y valores relevantes
+
+    return knowledge
+
+def correct_formulario(knowledge: dict) -> Formulario:
+    formulario_corregido = Formulario()
+
+    # Corregir campo1
+    if "campo1" in knowledge:
+        formulario_corregido.campo1 = knowledge["campo1"]
+
+    # Corregir campo2
+    if "campo2" in knowledge:
+        formulario_corregido.campo2 = knowledge["campo2"]
+
+    # ... corregir otros campos del formulario
+
+    return formulario_corregido
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+#+end_src
